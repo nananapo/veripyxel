@@ -1,73 +1,48 @@
 module main
 (
-    input sys_clk,           // clk input
-    input sys_rst_n,         // reset input
-    //output reg [5:0] led,    // 6 LEDS pin
-    //output reg [5:0] led,    // 6 LEDS pin
-    input uart_rx,
-    output uart_tx,
-    input btn1
+    input wire sys_clk,      // clk input
+    input wire btn1,         // right button
+    output wire uart_tx      // uart transmission
 );
 
-reg [7:0] str[286:0];
-reg [31:0] strCount = 5;
+reg sb_start = 0;
+reg [8:0] sb_maru = 1;
+reg [8:0] sb_batu = 4;
+wire sb_ready;
 
-initial begin
-    str[0] = "H";
-    str[1] = "e";
-    str[2] = "l";
-    str[3] = "l";
-    str[4] = "o";
-end
-
-// UART
-reg uart_start = 0;
-reg [7:0] uart_data;
-wire uart_ready;
-
-uart_tx #() sender (
+sendboard #() sb (
     .sys_clk(sys_clk),
-    .start(uart_start),
-    .data(uart_data),
+    .start(sb_start),
+    .maru(sb_maru),
+    .batu(sb_batu),
     .uart_tx(uart_tx),
-    .ready(uart_ready)
+    .ready(sb_ready)
 );
 
-reg [31:0] strIndex = 0;
 reg [3:0] state = 0;
 
 localparam STATE_IDLE = 0;
-localparam STATE_SUBMIT_INIT = 1;
-localparam STATE_SUBMIT_READY = 1;
+localparam STATE_SUBMIT = 1;
 localparam STATE_END = 2;
 
-
 always @(posedge sys_clk) begin
+
     case (state)
         STATE_IDLE: begin
             if (btn1 == 0) begin
-                state <= STATE_SUBMIT_INIT;
-                strIndex <= 0;
+                state <= STATE_SUBMIT;
             end else begin
                 state <= STATE_IDLE;
-                uart_start <= 0;
             end
         end
-        STATE_SUBMIT_INIT: begin
-            uart_start <= 1;
-            if (strIndex == strCount) begin
+        STATE_SUBMIT: begin
+            if (sb_ready == 1) begin
+                sb_start <= 1;
                 state <= STATE_END;
-            end else if (uart_ready == 1) begin
-                uart_data <= str[strIndex];
-                strIndex <= strIndex + 1;
-                state <= STATE_SUBMIT_READY;
             end
-        end
-        STATE_SUBMIT_READY: begin
-            state <= STATE_SUBMIT_INIT;
         end
         STATE_END: begin
-            uart_start <= 0;
+            sb_start <= 0;
             state <= STATE_IDLE;
         end
     endcase
