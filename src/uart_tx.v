@@ -17,6 +17,8 @@ reg [3:0] txState = 0;
 reg [31:0] txCounter = 0;
 reg [2:0] txBitNumber = 0;
 
+reg [7:0] dataCopy;
+
 reg txPin = 1;
 assign uart_tx = txPin;
 
@@ -36,8 +38,7 @@ always @(posedge sys_clk) begin
                 readyPin <= 0;
                 txState <= TX_STATE_START_BIT;
                 txCounter <= 0;
-            end else begin
-                readyPin <= 1;
+                dataCopy <= data;
             end
         end
         TX_STATE_START_BIT: begin
@@ -50,7 +51,7 @@ always @(posedge sys_clk) begin
                 txCounter <= txCounter + 1;
         end
         TX_STATE_WRITE: begin
-            txPin <= data[txBitNumber];
+            txPin <= dataCopy[txBitNumber];
             if ((txCounter + 1) == DELAY_FRAMES) begin
                 if (txBitNumber == 3'b111) begin
                     txState <= TX_STATE_STOP_BIT;
