@@ -81,37 +81,11 @@ reg [7:0] rgb_b;
 assign rst = ~rst_n;
 
 
-Gowin_rPLL #(
-/*
-    .FCLKIN    (27),
-    .IDIV_SEL  (PLL_IDIV),
-    .FBDIV_SEL (PLL_FBDIV),
-    .ODIV_SEL  (PLL_ODIV),
-    .DEVICE    ("GW1NSR-4C")
-*/
-) pll (
-// clkout, lock, clkin
+Gowin_rPLL #() pll (
+    // clkout, lock, clkin
     .clkout(clk_serial),
     .lock(pll_locked),
     .clkin(clk)
-/*
-    .CLKIN    (clk),
-    .CLKFB    (1'b0),
-    .RESET    (rst),
-    .RESET_P  (1'b0),
-    .FBDSEL   (6'b0),
-    .IDSEL    (6'b0),
-    .ODSEL    (6'b0),
-    .DUTYDA   (4'b0),
-    .PSDA     (4'b0),
-    .FDLY     (4'b0),
-    //.VREN     (1'b1),
-    .CLKOUT   (clk_serial),
-    .LOCK     (pll_locked),
-    .CLKOUTP  (),
-    .CLKOUTD  (),
-    .CLKOUTD3 ()
-*/
 );
 
 CLKDIV #(
@@ -208,10 +182,10 @@ always @(negedge rst_n or posedge clk_pixel)
     end
 
 always @(*)
-    if (cnt_white == DVI_H_ACTIVE * DVI_V_ACTIVE - 1'd1) begin
+    if (cnt_white >= DVI_H_ACTIVE * DVI_V_ACTIVE - 1'd1) begin
         cnt_white_next = 24'd0;
     end else begin
-        cnt_white_next = cnt_white + 1'd1;
+        cnt_white_next = cnt_white + DVI_V_ACTIVE;//24'd1000;
     end
 
 reg [23:0] cnt_de;
@@ -242,6 +216,6 @@ always @(negedge rst_n or posedge clk_pixel)
         {rgb_r, rgb_g, rgb_b} <= rgb_next;
     end
 
-assign rgb_next = cnt_de < cnt_white ? 24'hFFFFFF : 24'h000000;
+assign rgb_next = cnt_de < cnt_white ? 24'hFFFFFF : 24'h00BBBB;
 
 endmodule
