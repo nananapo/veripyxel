@@ -169,24 +169,8 @@ always @(*) begin
     end
 end
 
+
 // Video Pattern Generator
-
-reg [23:0] cnt_white;
-reg [23:0] cnt_white_next;
-
-always @(negedge rst_n or posedge clk_pixel)
-    if (!rst_n) begin
-        cnt_white <= 24'd0;
-    end else if (cnt_h == 12'd0 && cnt_v == 12'd0) begin
-        cnt_white <= cnt_white_next;
-    end
-
-always @(*)
-    if (cnt_white >= DVI_H_ACTIVE * DVI_V_ACTIVE - 1'd1) begin
-        cnt_white_next = 24'd0;
-    end else begin
-        cnt_white_next = cnt_white + DVI_V_ACTIVE;//24'd1000;
-    end
 
 reg [23:0] cnt_de;
 reg [23:0] cnt_de_next;
@@ -207,15 +191,64 @@ always @(*)
         cnt_de_next = cnt_de;
     end
 
-wire [23:0] rgb_next;
+localparam VRAM_SCALE = 3'd3;
+
+localparam VRAM_HEIGHT = (DVI_V_ACTIVE >> VRAM_SCALE);
+localparam VRAM_WIDTH  = (DVI_H_ACTIVE >> VRAM_SCALE);
+localparam VRAM_SIZE   = VRAM_HEIGHT * {23'b0, VRAM_WIDTH};
+
+reg [23:0] vram [VRAM_SIZE - 1:0];
+
+localparam SW_STATE_IDLE = 0;
+localparam SW_STATE_CHANGE = 1;
+
+reg lastbtn = 1;
+reg switchstate = SW_STATE_IDLE;
+reg [23:0] swindex = 0;
+wire [23:0] sw_x = swindex % VRAM_WIDTH;
+
+always @(posedge clk) begin
+    if (switchstate == SW_STATE_IDLE) begin
+        if (btn1 != lastbtn) begin
+            lastbtn <= btn1;
+            switchstate <= SW_STATE_CHANGE;
+            swindex <= 0;
+        end
+    end else begin
+        if (swindex >= VRAM_SIZE) begin
+            switchstate <= SW_STATE_IDLE;
+        end else if (lastbtn == 0) begin
+            if (sw_x > VRAM_WIDTH / 2)
+                vram[swindex] = 24'hFFFFFF;
+            else
+                vram[swindex] = 24'h000000;
+            swindex <= swindex + 1;
+        end else begin
+            if (sw_x > VRAM_WIDTH / 2)
+                vram[swindex] = 24'h000000;
+            else
+                vram[swindex] = 24'hFFFFFF;
+            swindex <= swindex + 1;
+        end
+    end
+end
+
+wire [11:0] act_x = cnt_de % DVI_H_ACTIVE;
+wire [11:0] act_y = cnt_de / DVI_H_ACTIVE;
+
+wire [11:0] v_x = act_x >> VRAM_SCALE;
+wire [11:0] v_y = act_y >> VRAM_SCALE;
+
+wire [23:0] v_index = v_x + v_y * VRAM_WIDTH;
 
 always @(negedge rst_n or posedge clk_pixel)
     if (!rst_n) begin
         {rgb_r, rgb_g, rgb_b} <= 24'h000000;
     end else begin
-        {rgb_r, rgb_g, rgb_b} <= rgb_next;
+        if (v_index < VRAM_SIZE)
+            {rgb_r, rgb_g, rgb_b} <= vram[v_index];
+        else
+            {rgb_r, rgb_g, rgb_b} <= 24'hFF0000;
     end
-
-assign rgb_next = cnt_de < cnt_white ? 24'hFFFFFF : 24'h00BBBB;
 
 endmodule
