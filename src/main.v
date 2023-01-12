@@ -195,39 +195,54 @@ localparam VRAM_SCALE = 3'd3;
 
 localparam VRAM_HEIGHT = (DVI_V_ACTIVE >> VRAM_SCALE);
 localparam VRAM_WIDTH  = (DVI_H_ACTIVE >> VRAM_SCALE);
-localparam VRAM_SIZE   = VRAM_HEIGHT * {23'b0, VRAM_WIDTH};
+localparam VRAM_SIZE   = VRAM_HEIGHT * {24'b0, VRAM_WIDTH};
 
 reg [23:0] vram [VRAM_SIZE - 1:0];
 
 localparam SW_STATE_IDLE = 0;
 localparam SW_STATE_CHANGE = 1;
 
-reg lastbtn = 1;
 reg switchstate = SW_STATE_IDLE;
 reg [23:0] swindex = 0;
-wire [23:0] sw_x = swindex % VRAM_WIDTH;
+wire [11:0] sw_x = swindex % VRAM_WIDTH;
+wire [11:0] sw_y = swindex / VRAM_HEIGHT;
+
+reg [23:0] colors [7:0];
+initial begin
+    colors[0] = 24'hFF0000;
+    colors[1] = 24'h00FF00;
+    colors[2] = 24'h0000FF;
+    colors[3] = 24'hFFFF00;
+    colors[4] = 24'hFF00FF;
+    colors[5] = 24'h00FFFF;
+    colors[6] = 24'hFFFFFF;
+    colors[7] = 24'h000000;
+end
+
+reg [23:0] sw_clock = 0;
 
 always @(posedge clk) begin
     if (switchstate == SW_STATE_IDLE) begin
-        if (btn1 != lastbtn) begin
-            lastbtn <= btn1;
+        if (sw_clock == 24'd10000000) begin
             switchstate <= SW_STATE_CHANGE;
             swindex <= 0;
-        end
+            sw_clock <= 0;
+
+            colors[0] <= colors[1];
+            colors[1] <= colors[2];
+            colors[2] <= colors[3];
+            colors[3] <= colors[4];
+            colors[4] <= colors[5];
+            colors[5] <= colors[6];
+            colors[6] <= colors[7];
+            colors[7] <= colors[0];
+        end else
+            sw_clock <= sw_clock + 1;
     end else begin
         if (swindex >= VRAM_SIZE) begin
             switchstate <= SW_STATE_IDLE;
-        end else if (lastbtn == 0) begin
-            if (sw_x > VRAM_WIDTH / 2)
-                vram[swindex] = 24'hFFFFFF;
-            else
-                vram[swindex] = 24'h000000;
-            swindex <= swindex + 1;
         end else begin
-            if (sw_x > VRAM_WIDTH / 2)
-                vram[swindex] = 24'h000000;
-            else
-                vram[swindex] = 24'hFFFFFF;
+            vram[swindex] <= colors[sw_x  / (VRAM_WIDTH / 8)];
             swindex <= swindex + 1;
         end
     end
