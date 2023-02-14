@@ -200,82 +200,30 @@ localparam VRAM_SIZE   = VRAM_HEIGHT * {24'b0, VRAM_WIDTH};
 reg [23:0] vram [VRAM_SIZE - 1:0];
 
 
-reg [9:0] alpA [9:0];
-
+localparam ALP = 8 * 26;
+reg [7:0] alphabet[ALP - 1:0];
 initial begin
-    alpA[0] = 10'b0000110000;
-    alpA[1] = 10'b0000110000;
-    alpA[2] = 10'b0001001000;
-    alpA[3] = 10'b0001001000;
-    alpA[4] = 10'b0010000100;
-    alpA[5] = 10'b0011111100;
-    alpA[6] = 10'b0010000100;
-    alpA[7] = 10'b0010000100;
-    alpA[8] = 10'b0100000010;
-    alpA[9] = 10'b0100000010;
+    $readmemb("src/font/a.hex", alphabet);
 end
 
 
-localparam SW_STATE_IDLE = 0;
-localparam SW_STATE_CHANGE = 1;
-
-reg switchstate = SW_STATE_IDLE;
 reg [23:0] swindex = 0;
 wire [11:0] sw_x = swindex % VRAM_WIDTH;
 wire [11:0] sw_y = swindex / VRAM_WIDTH;
 
-reg [23:0] colors [7:0];
-initial begin
-    colors[0] = 24'hB4958A;
-    colors[1] = 24'h898E76;
-    colors[2] = 24'h546F7E;
-    colors[3] = 24'h211D33;
-    colors[4] = 24'h808DA9;
-    colors[5] = 24'h589BBB;
-    colors[6] = 24'h87CDE3;
-    colors[7] = 24'hE6C1A4;
-end
+reg [31:0] acount = 0;
 
-reg [31:0] sw_clock = 0;
+wire bitW = alphabet[(sw_y % 8 + 8 * (sw_x / 8) + acount / 100) % ALP][7 - sw_x % 8];
 
 always @(posedge clk) begin
     if (swindex >= VRAM_SIZE) begin
         swindex <= 0;
+        acount <= acount + 1;
     end else begin
-        vram[swindex] <= alpA[sw_y % 10][9 - sw_x % 10] == 0 ? 24'h000000 : 24'hFFFFFF;
+        vram[swindex] <= bitW == 1'b1 ? 24'hFFFFFF : 24'h000000;
         swindex <= swindex + 1;
-        $display("%d = %d - %d : %d", swindex, sw_y, sw_x, alpA[sw_y % 10][9 - sw_x % 10]);
     end
 end
-
-/*
-always @(posedge clk) begin
-    if (switchstate == SW_STATE_IDLE) begin
-        if (sw_clock == 32'd60000000) begin
-            switchstate <= SW_STATE_CHANGE;
-            swindex <= 0;
-            sw_clock <= 0;
-
-            colors[0] <= colors[1];
-            colors[1] <= colors[2];
-            colors[2] <= colors[3];
-            colors[3] <= colors[4];
-            colors[4] <= colors[5];
-            colors[5] <= colors[6];
-            colors[6] <= colors[7];
-            colors[7] <= colors[0];
-        end else
-            sw_clock <= sw_clock + 1;
-    end else begin
-        if (swindex >= VRAM_SIZE) begin
-            switchstate <= SW_STATE_IDLE;
-        end else begin
-            vram[swindex] <= colors[sw_x  / (VRAM_WIDTH / 8)];
-            swindex <= swindex + 1;
-        end
-    end
-end
-*/
 
 wire [11:0] act_x = cnt_de % DVI_H_ACTIVE;
 wire [11:0] act_y = cnt_de / DVI_H_ACTIVE;
@@ -290,9 +238,8 @@ always @(negedge rst_n or posedge clk_pixel)
         {rgb_r, rgb_g, rgb_b} <= 24'h000000;
     end else begin
         if (v_index < VRAM_SIZE)
-            {rgb_r, rgb_g, rgb_b} <= vram[v_index];
+            {rgb_r, rgb_g, rgb_b} <= vram[v_index % VRAM_SIZE];
         else
             {rgb_r, rgb_g, rgb_b} <= 24'hFF0000;
     end
-
 endmodule
